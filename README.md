@@ -36,6 +36,23 @@ One-shot container for init PostgreSQL users, databases, extensions.
       - net
 ```
 
+### Alternative mode
+
+Creates one user and multiple bases:
+
+``` yaml
+  postgres-schema:
+    image: osshelp/postgres-schema:stable
+    deploy:
+      restart_policy:
+        condition: none
+    environment:
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+      POSTGRES_CREATE_USER: "user:pass@db1,db2,db3"
+    networks:
+      - net
+```
+
 ## Parameters
 
 Setting|Default|Description
@@ -46,7 +63,9 @@ Setting|Default|Description
 `POSTGRES_PASSWORD`|`postgres`|PostgreSQL superuser password
 `POSTGRES_TIMEOUT`|`60`|Timeout in seconds for wating PostgreSQL host connection
 `POSTGRES_DBS`|-|List of DB_NAME:PASSWORD (delimiter: space or comma. USERNAME is equal to DBNAME)
+`POSTGRES_CREATE_USER`|-|A user string with DB list. Format: `user:pass@db1,db2,db3`
 `POSTGRES_EXTENSIONS`|-|List of PostgreSQL extensions (delimiter: space or comma)
+`SKIP_DBS_CREATION`|-|The variable for POSTGRES_CREATE_USER mode only. If defined then no databases will be created
 
 ### Internal usage
 
@@ -65,3 +84,4 @@ There is no difference between the DockerHub image and the oss.help/pub image.
 ## TODO
 
 - Add fixture dumps support (restore from dump if DB doesn't exits)
+- Add GRANT tests

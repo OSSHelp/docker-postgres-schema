@@ -11,19 +11,20 @@ check_postgres_is_available() {
 create_db() {
 	local db_name="$1"
 	psql $psql_params --command="SELECT FROM pg_database WHERE datname = '$db_name'" | grep -q 0 \
-	&& { psql $psql_params --command="CREATE DATABASE $db_name"; return 0; }
+	&& { psql $psql_params --command="CREATE DATABASE $db_name"; return "$?"; }
 	echo "The db $db_name exists. Skipping"
 }
 
 create_role() {
-	local db_name="$1"; local user_pass="$2"
-	psql $psql_params --command="SELECT FROM pg_roles WHERE rolname='$db_name'" | grep -q 0 \
-	&& {
-		psql $psql_params --command="CREATE USER $db_name WITH password '$user_pass'"
-		psql $psql_params --command="GRANT ALL privileges ON DATABASE $db_name TO $db_name"
-		return 0
-	}
-	echo "The role $db_name exists. Skipping"
+	local user_name="$1"; local user_pass="$2"
+	psql $psql_params --command="SELECT FROM pg_roles WHERE rolname='$user_name'" | grep -q 0 \
+	&& { psql $psql_params --command="CREATE USER $user_name WITH password '$user_pass'"; return "$?"; }
+	echo "The role $user_name exists. Skipping"
+}
+
+grant_privileges_to_db() {
+	local db_name="$1"; local user_name="$2"
+	psql $psql_params --command="GRANT ALL privileges ON DATABASE $db_name TO $user_name"
 }
 
 create_extensions() {
@@ -33,10 +34,27 @@ create_extensions() {
 }
 
 create_dbs_and_roles() {
-	for db in ${POSTGRES_DBS//,/ }; do
-		create_db "${db%%:*}"
-		create_role "${db%%:*}" "${db#*:}"
-	done
+	test -n "$POSTGRES_DBS" && {
+		for db in ${POSTGRES_DBS//,/ }; do
+			create_db "${db%%:*}"
+			create_role "${db%%:*}" "${db#*:}"
+			grant_privileges_to_db "${db%%:*}" "${db%%:*}"
+		done
+		return 0;
+	}
+
+	test -n "$POSTGRES_CREATE_USER" && {
+		user="${POSTGRES_CREATE_USER%%@*}"
+		dbs="${POSTGRES_CREATE_USER#*@}"
+		create_role "${user%%:*}" "${user#*:}"
+		for db in ${dbs//,/ }; do
+			test -z "$SKIP_DBS_CREATION" && create_db "$db"
+			grant_privileges_to_db "$db" "${user%%:*}"
+		done
+		return 0;
+	}
+
+	echo "No POSTGRES_DBS or POSTGRES_CREATE_USER variables exist. Skipping"
 }
 
 until check_postgres_is_available; do

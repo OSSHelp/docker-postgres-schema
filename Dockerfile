@@ -1,4 +1,4 @@
-FROM postgres:12.3-alpine
+FROM postgres:13-alpine
 
 LABEL maintainer="OSSHelp Team, https://oss.help"
 LABEL description="One shot container which creates dbs, users and extensions"
