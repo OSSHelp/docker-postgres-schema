@@ -28,17 +28,19 @@ grant_privileges_to_db() {
 }
 
 create_extensions() {
+	local db_name="$1"
 	for extension in ${POSTGRES_EXTENSIONS//,/ }; do
-		psql $psql_params --command="CREATE EXTENSION IF NOT EXISTS $extension"
+		psql $psql_params --dbname="$db_name" --command="CREATE EXTENSION IF NOT EXISTS \"$extension\""
 	done
 }
 
-create_dbs_and_roles() {
+create_dbs_roles_and_extensions() {
 	test -n "$POSTGRES_DBS" && {
 		for db in ${POSTGRES_DBS//,/ }; do
 			create_db "${db%%:*}"
 			create_role "${db%%:*}" "${db#*:}"
 			grant_privileges_to_db "${db%%:*}" "${db%%:*}"
+			test -n "$POSTGRES_EXTENSIONS" && create_extensions "${db%%:*}"
 		done
 		return 0;
 	}
@@ -48,7 +50,10 @@ create_dbs_and_roles() {
 		dbs="${POSTGRES_CREATE_USER#*@}"
 		create_role "${user%%:*}" "${user#*:}"
 		for db in ${dbs//,/ }; do
-			test -z "$SKIP_DBS_CREATION" && create_db "$db"
+			test -z "$SKIP_DBS_CREATION" && {
+				create_db "$db"
+				test -n "$POSTGRES_EXTENSIONS" && create_extensions "$db"
+			}
 			grant_privileges_to_db "$db" "${user%%:*}"
 		done
 		return 0;
@@ -63,5 +68,4 @@ until check_postgres_is_available; do
 	test $POSTGRES_TIMEOUT -eq 0 && { echo "ERROR. Postgres is unavailable $POSTGRES_HOST:$POSTGRES_PORT"; exit 1;}
 done
 
-create_dbs_and_roles
-create_extensions
+create_dbs_roles_and_extensions
